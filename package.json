@@ -1,0 +1,22 @@
+{
+  "name": "whatsapp-food-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Cloud API bot for food ordering with interactive menus, UPI payments, and COD",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": ["whatsapp", "bot", "food-ordering", "upi", "cod", "cloud-api"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
