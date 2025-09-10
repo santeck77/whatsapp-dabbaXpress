@@ -203,15 +203,7 @@ app.post('/webhook', async (req, res) => {
         await sendMsg(from, { 
           type: 'text', 
           text: { 
-            body: `💳 UPI Payment\n\nAmount: ₹${sess.amount}\nUPI ID: ${process.env.UPI_ID}\n\nTo pay:\n1. Open your UPI app (PhonePe, GPay, Paytm)\n2. Enter UPI ID: ${process.env.UPI_ID}\n3. Enter amount: ₹${sess.amount}\n4. Add note: Order from ${process.env.BRAND_NAME}\n\nPayment done ho jaye to reply: PAID` 
-          } 
-        });
-        
-        // Also send the UPI link as a separate message for those who want to use it
-        await sendMsg(from, { 
-          type: 'text', 
-          text: { 
-            body: `🔗 UPI Link (copy and paste in browser):\n${link}` 
+            body: `💳 UPI Payment\n\nAmount: ₹${sess.amount}\nUPI ID: ${process.env.UPI_ID}\n\n📱 iPhone Users:\n1. Open your UPI app (PhonePe, GPay, Paytm)\n2. Enter UPI ID: ${process.env.UPI_ID}\n3. Enter amount: ₹${sess.amount}\n4. Add note: Order from ${process.env.BRAND_NAME}\n\n🤖 Android Users:\nClick this link: ${link}\n\n💡 Alternative for all users:\nCopy this UPI ID: ${process.env.UPI_ID}\nAnd amount: ₹${sess.amount}\n\nPayment done ho jaye to reply: PAID` 
           } 
         });
         return res.sendStatus(200);
