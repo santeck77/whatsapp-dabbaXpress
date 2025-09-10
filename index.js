@@ -36,12 +36,17 @@ app.get('/webhook', (req, res) => {
 // 2) Incoming messages
 app.post('/webhook', async (req, res) => {
   try {
+    console.log('📨 Webhook received:', JSON.stringify(req.body, null, 2));
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
     const value = change?.value;
     const msg = value?.messages?.[0];
     const contact = value?.contacts?.[0];
-    if (!msg) return res.sendStatus(200);
+    if (!msg) {
+      console.log('❌ No message found in webhook payload');
+      return res.sendStatus(200);
+    }
+    console.log('✅ Message found:', msg);
 
     const from = msg.from;                      // user wa_id
     const name = contact?.profile?.name || '';
