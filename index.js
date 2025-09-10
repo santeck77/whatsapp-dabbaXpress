@@ -199,7 +199,21 @@ app.post('/webhook', async (req, res) => {
         sess.stage = 'await_upi';
         STATE.set(from, sess);
 
-        await sendMsg(from, { type: 'text', text: { body: `Pay via UPI:\n${link}\n\nPayment done ho jaye to reply: PAID` } });
+        // Send UPI payment instructions
+        await sendMsg(from, { 
+          type: 'text', 
+          text: { 
+            body: `💳 UPI Payment\n\nAmount: ₹${sess.amount}\nUPI ID: ${process.env.UPI_ID}\n\nTo pay:\n1. Open your UPI app (PhonePe, GPay, Paytm)\n2. Enter UPI ID: ${process.env.UPI_ID}\n3. Enter amount: ₹${sess.amount}\n4. Add note: Order from ${process.env.BRAND_NAME}\n\nPayment done ho jaye to reply: PAID` 
+          } 
+        });
+        
+        // Also send the UPI link as a separate message for those who want to use it
+        await sendMsg(from, { 
+          type: 'text', 
+          text: { 
+            body: `🔗 UPI Link (copy and paste in browser):\n${link}` 
+          } 
+        });
         return res.sendStatus(200);
       }
       if (norm.includes('cash') || norm.includes('cod') || norm.includes('2')) {
