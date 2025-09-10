@@ -10,6 +10,9 @@ const STATE = new Map(); // super-simple in-memory session store
 
 const sendMsg = async (to, payload) => {
   const url = `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`;
+  console.log('📤 Sending message to:', to);
+  console.log('📤 Payload:', JSON.stringify(payload, null, 2));
+  
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -19,7 +22,13 @@ const sendMsg = async (to, payload) => {
     body: JSON.stringify({ messaging_product: 'whatsapp', to, ...payload }),
   });
   const data = await res.json();
-  if (!res.ok) console.error('WA send error:', data);
+  if (!res.ok) {
+    console.error('❌ WA send error:', data);
+    console.error('❌ Status:', res.status);
+    console.error('❌ Token used:', process.env.WHATSAPP_TOKEN?.substring(0, 20) + '...');
+  } else {
+    console.log('✅ Message sent successfully:', data);
+  }
   return data;
 };
 
@@ -67,12 +76,19 @@ app.post('/webhook', async (req, res) => {
 
     // route by stage
     if (sess.stage === 'start') {
-      // greeting + category (simple text with instructions)
+      // greeting + category (interactive buttons)
       await sendMsg(from, {
-        type: 'text',
-        text: { 
-          body: `Welcome to ${process.env.BRAND_NAME} 🍴\n\nPlease choose a category by typing:\n\n1️⃣ Type "1" or "basics" for Basics Menu\n2️⃣ Type "2" or "premium" for Premium Menu\n\nOr simply type the number!` 
-        }
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: `Welcome to ${process.env.BRAND_NAME} 🍴\nPlease choose a category:` },
+          action: {
+            buttons: [
+              { type: 'reply', reply: { id: 'cat_basic', title: '1️⃣ Basics' } },
+              { type: 'reply', reply: { id: 'cat_premium', title: '2️⃣ Premium' } },
+            ],
+          },
+        },
       });
       sess.stage = 'category';
       STATE.set(from, sess);
@@ -85,10 +101,22 @@ app.post('/webhook', async (req, res) => {
         sess.stage = 'menu_basics';
         STATE.set(from, sess);
         await sendMsg(from, {
-          type: 'text',
-          text: { 
-            body: `🍛 Basics Menu\n\nChoose an item by typing the number:\n\n1️⃣ Veg Thali - ₹120\n2️⃣ Paneer Curry + Roti - ₹150\n3️⃣ Dal Tadka + Rice - ₹100\n\nType the number (1, 2, or 3) to select!` 
-          }
+          type: 'interactive',
+          interactive: {
+            type: 'list',
+            header: { type: 'text', text: '🍛 Basics Menu' },
+            body: { text: 'Choose an item' },
+            action: {
+              button: 'Select',
+              sections: [
+                { title: 'Basics', rows: [
+                  { id: 'b1', title: 'Veg Thali', description: '₹120' },
+                  { id: 'b2', title: 'Paneer Curry + Roti', description: '₹150' },
+                  { id: 'b3', title: 'Dal Tadka + Rice', description: '₹100' },
+                ]},
+              ],
+            },
+          },
         });
         return res.sendStatus(200);
       }
@@ -97,10 +125,22 @@ app.post('/webhook', async (req, res) => {
         sess.stage = 'menu_premium';
         STATE.set(from, sess);
         await sendMsg(from, {
-          type: 'text',
-          text: { 
-            body: `🍽️ Premium Menu\n\nChoose an item by typing the number:\n\n1️⃣ Paneer Butter Masala + Naan - ₹240\n2️⃣ Veg Biryani + Raita - ₹220\n3️⃣ Kaju Curry + Tandoori Roti - ₹260\n\nType the number (1, 2, or 3) to select!` 
-          }
+          type: 'interactive',
+          interactive: {
+            type: 'list',
+            header: { type: 'text', text: '🍽️ Premium Menu' },
+            body: { text: 'Choose an item' },
+            action: {
+              button: 'Select',
+              sections: [
+                { title: 'Premium', rows: [
+                  { id: 'p1', title: 'Paneer Butter Masala + Naan', description: '₹240' },
+                  { id: 'p2', title: 'Veg Biryani + Raita', description: '₹220' },
+                  { id: 'p3', title: 'Kaju Curry + Tandoori Roti', description: '₹260' },
+                ]},
+              ],
+            },
+          },
         });
         return res.sendStatus(200);
       }
@@ -116,16 +156,13 @@ app.post('/webhook', async (req, res) => {
     };
 
     if (sess.stage === 'menu_basics' || sess.stage === 'menu_premium') {
-      // Handle number selection for menu items
-      let choice = null;
-      
-      if (text === '1' || norm.includes('1')) {
-        choice = sess.stage === 'menu_basics' ? priceMap.b1 : priceMap.p1;
-      } else if (text === '2' || norm.includes('2')) {
-        choice = sess.stage === 'menu_basics' ? priceMap.b2 : priceMap.p2;
-      } else if (text === '3' || norm.includes('3')) {
-        choice = sess.stage === 'menu_basics' ? priceMap.b3 : priceMap.p3;
-      }
+      // when interactive list reply arrives, WhatsApp sends interactive.list_reply.id/title,
+      // but we normalized `text` to title; map both ways:
+      const chosen = Object.values(priceMap).find(v => v.item.toLowerCase() === text.toLowerCase());
+      let choice = chosen;
+      // fallback if you parse IDs from payload (optional)
+      const rowsId = msg?.interactive?.list_reply?.id;
+      if (!choice && rowsId && priceMap[rowsId]) choice = priceMap[rowsId];
 
       if (choice) {
         sess.item = choice.item;
@@ -134,10 +171,17 @@ app.post('/webhook', async (req, res) => {
         STATE.set(from, sess);
 
         await sendMsg(from, {
-          type: 'text',
-          text: { 
-            body: `You selected ${choice.item} – ₹${choice.amount} ✅\n\nChoose payment method by typing:\n\n1️⃣ Type "1" or "upi" for UPI Payment\n2️⃣ Type "2" or "cod" for Cash on Delivery\n\nType the number or method name!` 
-          }
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: { text: `You selected ${choice.item} – ₹${choice.amount} ✅\nChoose payment:` },
+            action: {
+              buttons: [
+                { type: 'reply', reply: { id: 'pay_upi', title: '1️⃣ UPI' } },
+                { type: 'reply', reply: { id: 'pay_cod', title: '2️⃣ Cash on Delivery' } },
+              ],
+            },
+          },
         });
         return res.sendStatus(200);
       }
